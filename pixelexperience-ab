@@ -1,0 +1,92 @@
+#!/bin/sh
+export USE_CCACHE=1
+export CCACHE_EXEC=/usr/bin/ccache
+
+set -e
+
+help() {
+    printf "\n\nUsage: ${0} [OPTIONS]
+
+    Available options:
+        - build
+        - clean\n\n"
+}
+
+if [ "${1}" = "build" ]; then
+    echo ""; read -p "Specify the branch to build for (e.g. eleven): " branch
+    read -p "Specify the device codename to build for (e.g. lancelot): " device_codename
+
+    if [ -z ${branch} ] || [ -z ${device_codename} ]; then
+        echo "Branch or device codename not specified, try again"
+        exit
+    fi
+
+    echo ""; echo "Installing dependencies..."
+    if [ ! -x "/usr/bin/yay" ]; then
+        echo "yay: command not found"
+        exit 1
+        else
+            yay -S aosp-devel --needed --noconfirm
+    fi
+
+    if [ ! -d "pixel" ]; then
+        echo ""; echo "Creating pixel folder..."; mkdir -p pixel
+    fi 
+
+    echo ""; echo "Changing directory to lineage pixel..."; cd pixel
+
+    if [ "${device_codename}" = "lancelot" ]; then
+        if [ ! -d ".repo/local_manifests" ]; then
+            echo ""; echo "Creating directory '.repo/local_manifests'..."
+            mkdir -p .repo/local_manifests
+        fi
+        printf '<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+    <remote name="Redmi-MT6768" fetch="https://github.com/Redmi-MT6768" revision="eleven"/>
+
+    <!-- Device Trees -->
+    <project path="device/xiaomi/lancelot" name="android_device_xiaomi_lancelot" remote="Redmi-MT6768"/>
+ 
+    <!-- Kernel -->
+    <project path="kernel/xiaomi/mt6768" name="android_kernel_xiaomi_mt6768" remote="Redmi-MT6768"/>
+
+    <!-- Vendor Trees -->
+    <project path="vendor/xiaomi/lancelot" name="android_vendor_xiaomi_lancelot" remote="Redmi-MT6768"/>
+  
+   <!-- Extras -->
+    <project path="vendor/mediatek/ims" name="vendor_mediatek_ims" remote="Redmi-MT6768"/>
+    <project path="vendor/mediatek/interfaces" name="PixelExperience/vendor_mediatek_interfaces" remote="github" revision="eleven"/>
+</manifest>\n' > .repo/local_manifests/${device_codename}.xml
+    fi
+
+    if [ -x "/usr/bin/repo" ]; then
+        echo ""; echo "Initializing PixelExperience repository..."
+        repo init -u https://github.com/PixelExperience/manifest -b "${branch}"
+        else
+            echo ""; echo "Please install repo to continue"
+        exit 1
+    fi
+
+    echo ""; echo "Downloading PixelExperience source tree..."
+    repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+
+    echo ""; echo "Setting up environment..."
+    . build/envsetup.sh; ccache -M 50G
+
+    if [ "${device_codename}" != "lancelot" ]; then
+        echo ""; echo "Extracting propietary blobs for '${device_codename}'..."
+        for i in device/xiaomi/${device_codename}/*.sh; do
+            chmod +x "${i}"
+        done
+        sudo ./device/xiaomi/${device_codename}/extract-files.sh
+    fi
+
+    echo ""; echo "Building 'aosp_${device_codename}-userdebug'..."
+    lunch aosp_${device_codename}-userdebug; mka bacon -j$(nproc --all)
+    exit 
+    elif [ "${1}" = "clean" ]; then
+        rm -rfv pixel
+        exit
+    else
+        help
+fi
