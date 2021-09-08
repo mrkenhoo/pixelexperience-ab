@@ -18,17 +18,23 @@ if [ "${1}" = "build" ]; then
     echo ""; read -p "Specify the branch to build for (e.g. eleven): " branch
     read -p "Specify the device codename to build for (e.g. lancelot): " device_codename
 
-    if [ -z ${branch} ] || [ -z ${device_codename} ]; then
+    if [ -z "${branch}" ] || [ -z "${device_codename}" ]; then
         echo "Branch or device codename not specified, try again"
         exit
     fi
 
-    echo ""; echo "Installing dependencies..."
-    if [ ! -x "/usr/bin/yay" ]; then
-        echo "yay: command not found"
-        exit 1
-        else
+    pkgs=(
+        "git"
+        "yay"
+    )
+    if [ ! -f "${pkgs[@]}" ]; then
+        echo ""; echo "Installing dependencies..."
+        if [ "${pkgs[@]}" = "git" ]; then
+            pacman -S git --needed --noconfirm
+        elif [ "${pkgs[@]}" = "yay" ]; then
+            git clone https://aur.archlinux.org/yay-git.git; makepkg -csi
             yay -S aosp-devel --needed --noconfirm
+        fi
     fi
 
     if [ ! -d "pixel" ]; then
@@ -42,7 +48,7 @@ if [ "${1}" = "build" ]; then
         mkdir -p ".repo/local_manifests"
     fi
     if [ ! -f ".repo/local_manifests/${device_codename}" ]; then
-        if [ "${device_codename}" = "lancelot" ]; then
+        if [ "${device_codename}" = "lava" ]; then
             if [ ! -f ".repo/local_manifests/${device_codename}" ]; then
                 echo ""; echo "Creating file '.repo/local_manifests/${device_codename}.xml'..."
                 printf '<?xml version="1.0" encoding="UTF-8"?>
@@ -51,6 +57,7 @@ if [ "${1}" = "build" ]; then
 
     <!-- Device Trees -->
     <project path="device/xiaomi/lava" name="android_device_xiaomi_lava" remote="Redmi-MT6768"/>
+    <project path="device/xiaomi/mt6768-common" name="android_device_xiaomi_mt6768-common" remote="Redmi-MT6768"/>
  
     <!-- Kernel -->
     <project path="kernel/xiaomi/mt6768" name="android_kernel_xiaomi_mt6768" remote="Redmi-MT6768"/>
@@ -59,8 +66,7 @@ if [ "${1}" = "build" ]; then
     <project path="vendor/xiaomi/lava" name="android_vendor_xiaomi_lava" remote="Redmi-MT6768"/>
 
     <!-- Extras -->
-    <project path="vendor/mediatek/ims" name="vendor_mediatek_ims" remote="Redmi-MT6768"/>
-    <project path="vendor/mediatek/interfaces" name="PixelExperience/vendor_mediatek_interfaces" remote="github" revision="eleven"/>
+    <project path="device/mediatek/sepolicy_vndr" name="PixelExperience/device_mediatek_sepolicy_vndr" remote="github" revision="eleven"/>
 </manifest>\n' > ".repo/local_manifests/${device_codename}.xml"
             fi
         fi
@@ -77,7 +83,7 @@ if [ "${1}" = "build" ]; then
     echo ""; echo "Setting up environment..."
     . build/envsetup.sh; ccache -M 50G
 
-    if [ "${device_codename}" != "lancelot" ]; then
+    if [ "${device_codename}" != "lava" ]; then
         echo ""; echo "Extracting propietary blobs for '${device_codename}'..."
         for i in device/xiaomi/${device_codename}/*.sh; do
             chmod +x "${i}"
