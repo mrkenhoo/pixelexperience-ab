@@ -5,13 +5,11 @@ export CCACHE_EXEC=/usr/bin/ccache
 set -e
 
 help() {
-    printf "\n\nUsage: ${0} [OPTIONS]
+    printf "\nUsage: ${0} [OPTIONS]
 
     Available options:
         - build
-        - build-ponces_pe
-        - build-andycgyan_los
-        - clean\n\n"
+        - clean\n"
 }
 
 if [ "${1}" = "build" ]; then
@@ -23,18 +21,13 @@ if [ "${1}" = "build" ]; then
         exit
     fi
 
-    pkgs=(
-        "git"
-        "yay"
-    )
-    if [ ! -f "${pkgs[@]}" ]; then
-        echo ""; echo "Installing dependencies..."
-        if [ "${pkgs[@]}" = "git" ]; then
-            pacman -S git --needed --noconfirm
-        elif [ "${pkgs[@]}" = "yay" ]; then
-            git clone https://aur.archlinux.org/yay-git.git; makepkg -csi
+    echo ""; echo "Installing dependencies..."
+    if [ ! -x /usr/bin/git ] || [ ! -x /usr/bin/yay ]; then
+        pacman -S git --needed --noconfirm
+        git clone https://aur.archlinux.org/yay-git.git; makepkg -csi
+        yay -S aosp-devel --needed --noconfirm
+        else
             yay -S aosp-devel --needed --noconfirm
-        fi
     fi
 
     if [ ! -d "pixel" ]; then
@@ -47,30 +40,32 @@ if [ "${1}" = "build" ]; then
         echo ""; echo "Creating directory '.repo/local_manifests'..."
         mkdir -p ".repo/local_manifests"
     fi
-    if [ ! -f ".repo/local_manifests/${device_codename}" ]; then
-        if [ "${device_codename}" = "lava" ]; then
-            if [ ! -f ".repo/local_manifests/${device_codename}" ]; then
-                echo ""; echo "Creating file '.repo/local_manifests/${device_codename}.xml'..."
-                printf '<?xml version="1.0" encoding="UTF-8"?>
-<manifest>
-    <remote name="Redmi-MT6768" fetch="https://github.com/Redmi-MT6768" revision="eleven"/>
 
-    <!-- Device Trees -->
-    <project path="device/xiaomi/lava" name="android_device_xiaomi_lava" remote="Redmi-MT6768"/>
-    <project path="device/xiaomi/mt6768-common" name="android_device_xiaomi_mt6768-common" remote="Redmi-MT6768"/>
- 
-    <!-- Kernel -->
-    <project path="kernel/xiaomi/mt6768" name="android_kernel_xiaomi_mt6768" remote="Redmi-MT6768"/>
+    case "${branch}" in
+        "eleven"|"eleven-plus")
+            branch="${branch}"
+        ;;
 
-    <!-- Vendor Trees -->
-    <project path="vendor/xiaomi/lava" name="android_vendor_xiaomi_lava" remote="Redmi-MT6768"/>
+        *)
+            echo ""; echo ":: ERROR: ${branch}: Invalid or unknown branch"
+            exit 1
+        ;;
+    esac
 
-    <!-- Extras -->
-    <project path="device/mediatek/sepolicy_vndr" name="PixelExperience/device_mediatek_sepolicy_vndr" remote="github" revision="eleven"/>
-</manifest>\n' > ".repo/local_manifests/${device_codename}.xml"
+    case "${device_codename}" in
+        "lava"|"merlin")
+            if [ ! -f ".repo/local_manifests/redmi-mt6768.xml" ]; then
+                echo ""; echo "Fetching manifest file for ${device_codename} device..."
+                curl -sL https://raw.githubusercontent.com/Redmi-MT6768/local_manifests/master/eleven.xml -o ".repo/local_manifests/redmi-mt6768.xml" --create-dirs
             fi
-        fi
-    fi
+        ;;
+
+        *)
+            echo ""; echo ":: ERROR: ${device_codename}: Invalid or unknown device"
+            echo "This script only supports MediaTek devices from Xiaomi for now."
+            exit 1
+        ;;
+    esac
 
     if [ -x "/usr/bin/repo" ]; then
         echo ""; echo "Initializing PixelExperience repository..."
@@ -83,13 +78,11 @@ if [ "${1}" = "build" ]; then
     echo ""; echo "Setting up environment..."
     . build/envsetup.sh; ccache -M 50G
 
-    if [ "${device_codename}" != "lava" ]; then
-        echo ""; echo "Extracting propietary blobs for '${device_codename}'..."
-        for i in device/xiaomi/${device_codename}/*.sh; do
-            chmod +x "${i}"
-        done
-        sudo ./device/xiaomi/${device_codename}/extract-files.sh
-    fi
+    echo ""; echo "Extracting propietary blobs for '${device_codename}'..."
+    for i in device/xiaomi/${device_codename}/*.sh; do
+        chmod +x "${i}"
+    done
+    #sudo bash device/xiaomi/${device_codename}/extract-files.sh
 
     echo ""; echo "Building 'aosp_${device_codename}-userdebug'..."
     lunch aosp_${device_codename}-userdebug; mka bacon -j$(nproc --all)
