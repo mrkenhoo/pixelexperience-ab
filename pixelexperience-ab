@@ -94,60 +94,6 @@ if [ "${1}" = "build" ]; then
     echo ""; echo "Building 'aosp_${device_codename}-userdebug'..."
     lunch aosp_${device_codename}-userdebug; mka bacon -j$(nproc --all)
     exit
-    elif [ "${1}" = "build-ponces_pe" ]; then
-        if [ ! -d "pixel" ]; then
-            echo "Creating 'pixel' folder..."
-            mkdir pixel
-        fi
-
-        echo "Changing directory to 'pixel' folder..."
-        cd pixel
-
-        while true; do
-            echo ""; read -p "Specify a branch [eleven/eleven-plus]: " branch
-            case "${branch}" in
-                "eleven")
-                    repo init -u https://github.com/PixelExperience/manifest -b "${branch}"
-                    if [ ! -d "treble_build_pe" ]; then
-                        git clone https://github.com/ponces/treble_build_pe
-                        bash treble_build_pe/build.sh "${branch}"
-                        else
-                            bash treble_build_pe/build.sh "${branch}"
-                    fi
-                    break
-                ;;
-
-                "eleven-plus")
-                    repo init -u https://github.com/PixelExperience/manifest -b "${branch}"
-                    if [ ! -d "treble_build_pe" ]; then
-                        git clone https://github.com/ponces/treble_build_pe
-                        bash treble_build_pe/build.sh "${branch}"
-                        else
-                            bash treble_build_pe/build.sh "${branch}"
-                    fi
-                    break
-                ;;
-
-                *)
-                    echo ""; echo "Error: ${branch}: Invalid or unknown branch, try again."
-                ;;
-            esac
-        done
-        exit
-    elif [ "${1}" = "build-andycgyan_los" ]; then
-        if [ ! -d "treble_experimentations" ]; then
-            git clone https://github.com/AndyCGYan/treble_experimentations
-        fi
-        if [ ! -d "lineage-18.x-build-gsi" ]; then
-            mkdir lineage-18.x-build-gsi; cd lineage-18.x-build-gsi
-            repo init -u https://github.com/LineageOS/android.git -b lineage-18.1
-        fi
-        if [ ! -d "lineage_build_unified" ] && [ ! -d "lineage_patches_unified" ]; then
-            git clone https://github.com/AndyCGYan/lineage_build_unified -b lineage-18.1
-            git clone https://github.com/AndyCGYan/lineage_patches_unified -b lineage-18.1
-        fi
-        bash lineage_build_unified/buildbot_unified.sh treble 32B A64B 64B
-        exit
     elif [ "${1}" = "clean" ]; then
         rm -rfv pixel
         exit
