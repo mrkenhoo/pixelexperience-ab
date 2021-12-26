@@ -14,7 +14,7 @@ help() {
 
 if [ "${1}" = "build" ]; then
     echo ""; read -p "Specify the branch to build for (e.g. eleven): " branch
-    read -p "Specify the device codename to build for (e.g. lancelot): " device_codename
+    read -p "Specify the device codename to build for (e.g. lava): " device_codename
 
     if [ -z "${branch}" ] || [ -z "${device_codename}" ]; then
         echo "Branch or device codename not specified, try again"
@@ -42,7 +42,7 @@ if [ "${1}" = "build" ]; then
     fi
 
     case "${branch}" in
-        "eleven"|"eleven-plus")
+        "eleven"|"eleven-plus"|"twelve"|"twelve-plus")
             branch="${branch}"
         ;;
 
