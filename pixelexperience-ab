@@ -7,89 +7,86 @@ set -e
 help() {
     printf "\nUsage: ${0} [OPTIONS]
 
-    Available options:
-        - build
-        - clean\n"
+Options:
+    --branch,-b     Set the branch to be used
+    --brand,-B      Set the device's brand to be used
+    --device,-d     Set the device's codename to be used
+    --clean,-c      Clean and remove the building directory
+    --help,-h\n"
 }
 
-if [ "${1}" = "build" ]; then
-    echo ""; read -p "Specify the branch to build for (e.g. eleven): " branch
-    read -p "Specify the device codename to build for (e.g. lava): " device_codename
+[ -z "${1}" ] && help && exit
 
-    if [ -z "${branch}" ] || [ -z "${device_codename}" ]; then
-        echo "Branch or device codename not specified, try again"
-        exit
-    fi
+while [ $# -gt 0 ]; do
+    case "${1}" in
+        --branch|-b)
+            shift
+            export branch="${1}"
+        ;;
 
-    echo ""; echo "Installing dependencies..."
-    if [ ! -x /usr/bin/git ] || [ ! -x /usr/bin/yay ]; then
-        pacman -S git --needed --noconfirm
-        git clone https://aur.archlinux.org/yay-git.git; makepkg -csi
-        yay -S aosp-devel --needed --noconfirm
-        else
-            yay -S aosp-devel --needed --noconfirm
-    fi
+        --brand|-B)
+            shift
+            export device_brand="${1}"
+        ;;
 
-    if [ ! -d "pixel" ]; then
-        echo ""; echo "Creating pixel folder..."; mkdir -p pixel
-    fi 
+        --device|-d)
+            shift
+            export device_codename="${1}"
+        ;;
 
-    echo ""; echo "Changing directory to lineage pixel..."; cd pixel
+        --clean|-c)
+            [ -d "pixel" ] && \
+                rm -rfv "pixel"
+            exit
+        ;;
 
-    if [ ! -d ".repo/local_manifests" ]; then
-        echo ""; echo "Creating directory '.repo/local_manifests'..."
+        --help|-h)
+            help
+            exit
+        ;;
+
+        *)
+            help
+            exit
+        ;;
+    esac
+    shift
+done
+
+if [ -z "${branch}" ] || [ -z "${device_codename}" ]; then
+    echo "No branch or device specified"
+    exit
+fi
+
+echo "Installing dependencies..." && \
+    [ ! -x "$(which git)" ] && pacman -Syu git --needed --noconfirm > /dev/null 2>&1
+
+[ ! -x "$(which yay)" ] && \
+    git clone https://aur.archlinux.org/yay.git > /dev/null 2>&1 && \
+    cd yay && makepkg -csi > /dev/null 2>&1 && \
+    yay -Syu aosp-devel --needed --noconfirm > /dev/null 2>&1 || \
+    yay -Syu aosp-devel --needed --noconfirm > /dev/null 2>&1
+
+[ ! -d "pixel" ] && \
+    echo "Creating pixel folder..." && \
+    mkdir -p pixel && \
+    echo "Changing directory to pixel folder..." && \
+    cd pixel
+
+[ ! -d ".repo/local_manifests" ] && \
+    echo "Creating directory '.repo/local_manifests'..." && \
         mkdir -p ".repo/local_manifests"
-    fi
 
-    case "${branch}" in
-        "eleven"|"eleven-plus"|"twelve"|"twelve-plus")
-            branch="${branch}"
-        ;;
+[ -x "$(which repo)" ] && \
+    echo "Initializing PixelExperience repository..." && \
+    repo init -u https://github.com/PixelExperience/manifest -b "${branch}"
 
-        *)
-            echo ""; echo ":: ERROR: ${branch}: Invalid or unknown branch"
-            exit 1
-        ;;
-    esac
-
-    case "${device_codename}" in
-        "lava"|"merlin")
-            if [ ! -f ".repo/local_manifests/redmi-mt6768.xml" ]; then
-                echo ""; echo "Fetching manifest file for ${device_codename} device..."
-                curl -sL https://raw.githubusercontent.com/Redmi-MT6768/local_manifests/master/eleven.xml -o ".repo/local_manifests/redmi-mt6768.xml" --create-dirs
-            fi
-        ;;
-
-        *)
-            echo ""; echo ":: ERROR: ${device_codename}: Invalid or unknown device"
-            echo "This script only supports MediaTek devices from Xiaomi for now."
-            exit 1
-        ;;
-    esac
-
-    if [ -x "/usr/bin/repo" ]; then
-        echo ""; echo "Initializing PixelExperience repository..."
-        repo init -u https://github.com/PixelExperience/manifest -b "${branch}"
-    fi
-
-    echo ""; echo "Downloading PixelExperience source tree..."
+echo "Downloading PixelExperience source tree..." && \
     repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-    echo ""; echo "Setting up environment..."
-    . build/envsetup.sh; ccache -M 50G
+echo "Setting up environment..." && \
+    . build/envsetup.sh && \
+    ccache -M 50G
 
-    echo ""; echo "Extracting propietary blobs for '${device_codename}'..."
-    for i in device/xiaomi/${device_codename}/*.sh; do
-        chmod +x "${i}"
-    done
-    #sudo bash device/xiaomi/${device_codename}/extract-files.sh
-
-    echo ""; echo "Building 'aosp_${device_codename}-userdebug'..."
-    lunch aosp_${device_codename}-userdebug; mka bacon -j$(nproc --all)
-    exit
-    elif [ "${1}" = "clean" ]; then
-        rm -rfv pixel
-        exit
-    else
-        help
-fi
+echo "Building 'aosp_${device_codename}-userdebug'..."  && \
+    lunch aosp_${device_codename}-userdebug & mka bacon -j$(nproc --all)
