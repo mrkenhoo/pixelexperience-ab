@@ -59,7 +59,7 @@ if [ -z "${branch}" ] || [ -z "${device_codename}" ]; then
 fi
 
 echo "Installing dependencies..." && \
-    [ ! -x "$(which git)" ] && pacman -Syu git --needed --noconfirm > /dev/null 2>&1
+    [ ! -x "$(which git)" ] && pacman -Syu git --needed --noconfirm
 
 [ ! -x "$(which yay)" ] && \
     git clone https://aur.archlinux.org/yay.git > /dev/null 2>&1 && \
@@ -71,7 +71,9 @@ echo "Installing dependencies..." && \
     echo "Creating pixel folder..." && \
     mkdir -p pixel && \
     echo "Changing directory to pixel folder..." && \
-    cd pixel
+    cd pixel || \
+    echo "Changing directory to pixel folder..." && \
+    cd "pixel"
 
 [ ! -d ".repo/local_manifests" ] && \
     echo "Creating directory '.repo/local_manifests'..." && \
@@ -89,4 +91,7 @@ echo "Setting up environment..." && \
     ccache -M 50G
 
 echo "Building 'aosp_${device_codename}-userdebug'..."  && \
-    lunch aosp_${device_codename}-userdebug & mka bacon -j$(nproc --all)
+    breakfast ${device_codename} && \
+    make idegen && \
+    lunch aosp_${device_codename}-userdebug && \
+    mka bacon -j$(nproc --all)
